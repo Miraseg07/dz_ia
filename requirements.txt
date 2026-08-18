@@ -1,0 +1,8 @@
+Flask
+Flask-Login
+Flask-SQLAlchemy
+reportlab
+python-dotenv
+scikit-learn
+joblib
+numpy

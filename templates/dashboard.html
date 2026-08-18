@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Entrepreneur - {{ current_user.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 bg-light">
+  <!-- Banner Profil -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm rounded-4 p-4 text-white" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <span class="badge bg-white text-primary mb-2 px-3 py-2 rounded-pill fw-bold">
+              <i class="fas fa-graduation-cap me-1"></i> {{ current_user.niveau_etudes or 'Diplômé' }}
+            </span>
+            <h2 class="fw-bold mb-1">Espace Incubation & Projets IA</h2>
+            <p class="mb-0 opacity-75">
+              Profil : <strong>{{ current_user.domaine_diplome or 'Spécialité Générale' }}</strong> | Résidence : <strong>{{ current_user.wilaya_residence or 'Algérie' }}</strong>
+            </p>
+          </div>
+          <div>
+            <button class="btn btn-success btn-lg rounded-pill px-4 fw-bold shadow" data-bs-toggle="modal" data-bs-target="#modalGenIA">
+              <i class="fas fa-magic me-2"></i> Générer des Projets par IA
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section Projets Générés : tableau structuré par wilaya -->
+  <div class="row">
+    <div class="col-12 mb-3 d-flex justify-content-between align-items-center">
+      <h4 class="fw-bold text-dark mb-0">
+        <i class="fas fa-rocket text-primary me-2"></i> Mes Opportunités par Wilaya
+        <span class="badge bg-primary-subtle text-primary rounded-pill ms-1">{% if projets %}{{ projets|length }}{% else %}0{% endif %}</span>
+      </h4>
+    </div>
+
+    {% if projets_par_wilaya %}
+      <div class="col-12">
+        {% for wilaya_nom, liste_projets in projets_par_wilaya.items() %}
+        {% set code = wilaya_codes.get(wilaya_nom) %}
+        <div class="card border-0 shadow-sm rounded-4 mb-4">
+          <div class="card-header bg-white border-0 rounded-4 rounded-bottom-0 py-3 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="fw-bold text-dark mb-0">
+              <i class="fas fa-map-marker-alt text-primary me-2"></i>{{ wilaya_nom }}
+              <span class="badge bg-secondary-subtle text-secondary ms-2">{{ liste_projets|length }} opportunité{{ 's' if liste_projets|length > 1 else '' }}</span>
+            </h5>
+            {% if code %}
+            <a href="{{ url_for('api_wilaya_full', code=code) }}" class="btn btn-sm btn-outline-secondary rounded-pill" target="_blank">
+              <i class="fas fa-chart-bar me-1"></i> Données de la wilaya
+            </a>
+            {% endif %}
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">Projet</th>
+                  <th>Type</th>
+                  <th>Secteur</th>
+                  <th class="text-end">Budget estimé</th>
+                  <th>Créé le</th>
+                  <th class="text-end pe-4">Étude complète</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for projet in liste_projets %}
+                <tr>
+                  <td class="ps-4">
+                    <div class="fw-bold text-dark">{{ projet.nom }}</div>
+                    <div class="text-muted small line-clamp-2" style="max-width: 420px;">{{ projet.description }}</div>
+                  </td>
+                  <td>
+                    {% if projet.type_projet == 'hors_domaine' %}
+                    <span class="badge bg-warning-subtle text-warning-emphasis fw-bold px-2 py-1 rounded-pill">
+                      <i class="fas fa-compass me-1"></i> Hors domaine
+                    </span>
+                    {% else %}
+                    <span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1 rounded-pill">
+                      <i class="fas fa-graduation-cap me-1"></i> Dans domaine
+                    </span>
+                    {% endif %}
+                  </td>
+                  <td><span class="text-secondary">{{ projet.secteur }}</span></td>
+                  <td class="text-end">
+                    <strong class="text-success">
+                      {% if projet.budget_estime %}
+                        {{ "{:,.0f}".format(projet.budget_estime).replace(",", " ") }} DA
+                      {% else %}
+                        Sur mesure
+                      {% endif %}
+                    </strong>
+                  </td>
+                  <td><small class="text-muted">{{ projet.created_at.strftime('%d/%m/%Y') }}</small></td>
+                  <td class="text-end pe-4">
+                    {% if projet.pdf_path %}
+                    <a href="{{ url_for('static', filename=projet.pdf_path) }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill fw-bold">
+                      <i class="fas fa-file-pdf me-1"></i> PDF
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('api_wilaya_pdf', code=code or '01') }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill fw-bold">
+                      <i class="fas fa-file-pdf me-1"></i> Générer
+                    </a>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="col-12 text-center py-5">
+        <div class="bg-white rounded-4 p-5 shadow-sm">
+          <i class="fas fa-brain fa-4x text-primary mb-3 opacity-50"></i>
+          <h4 class="fw-bold text-dark">Aucun projet conçu pour le moment</h4>
+          <p class="text-muted max-w-md mx-auto mb-4">
+            Laissez l'IA analyser votre diplôme en <strong>{{ current_user.domaine_diplome or 'votre spécialité' }}</strong> et trouver, wilaya par wilaya, des opportunités concrètes — dans votre domaine et au-delà.
+          </p>
+          <button class="btn btn-primary btn-lg rounded-pill px-4 fw-bold" data-bs-toggle="modal" data-bs-target="#modalGenIA">
+            <i class="fas fa-magic me-2"></i> Générer Mes Premiers Projets par IA
+          </button>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal Générateur IA -->
+<div class="modal fade" id="modalGenIA" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-dark">
+          <i class="fas fa-robot text-primary me-2"></i> Générateur de Projets IA
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" id="btnCloseModalGenIA"></button>
+      </div>
+      <div class="modal-body p-4">
+
+        <!-- Étape 1 : formulaire -->
+        <div id="stepForm">
+          <p class="text-muted small mb-4">
+            Sélectionnez la Wilaya cible. L'IA va concevoir jusqu'à 5 opportunités concrètes — dans votre domaine
+            (<strong>{{ current_user.domaine_diplome or 'votre spécialité' }}</strong>) et hors domaine, en exploitant
+            le potentiel réel de la wilaya.
+          </p>
+
+          <div class="mb-4">
+            <label for="selectWilayaIA" class="form-label fw-bold">Wilaya Cible</label>
+            <select class="form-select form-select-lg rounded-3" id="selectWilayaIA">
+              {% for code, data in wilayas.items() %}
+              <option value="{{ code }}" {% if data.nom == current_user.wilaya_residence %}selected{% endif %}>
+                {{ code }} - {{ data.nom }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <button class="btn btn-primary btn-lg w-100 rounded-3 fw-bold py-3" id="btnLancerIA">
+            <i class="fas fa-wand-magic-sparkles me-2"></i> Concevoir Mes Projets
+          </button>
+        </div>
+
+        <!-- Étape 2 : chargement (masqué par défaut) -->
+        <div id="stepLoading" class="text-center py-4 d-none">
+          <div class="spinner-border text-primary mb-3" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+          <h5 class="fw-bold text-dark mb-2" id="loadingTitle">L'IA analyse la wilaya…</h5>
+          <p class="text-muted small mb-0" id="loadingSubtitle">Croisement des données territoriales avec votre profil…</p>
+          <div class="progress mt-4" style="height: 6px;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: 100%;"></div>
+          </div>
+          <p class="text-muted small mt-3 mb-0">Cela peut prendre jusqu'à une minute — merci de patienter, ne fermez pas cette fenêtre.</p>
+        </div>
+
+        <!-- Étape 3 : erreur (masqué par défaut) -->
+        <div id="stepError" class="text-center py-4 d-none">
+          <i class="fas fa-triangle-exclamation fa-3x text-danger mb-3"></i>
+          <h5 class="fw-bold text-dark mb-2">Une erreur est survenue</h5>
+          <p class="text-muted small mb-4" id="errorMessage">Erreur inconnue.</p>
+          <button class="btn btn-primary rounded-3 fw-bold" id="btnRetryIA">
+            <i class="fas fa-rotate-right me-2"></i> Réessayer
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const btnLancer   = document.getElementById('btnLancerIA');
+  const btnRetry     = document.getElementById('btnRetryIA');
+  const btnClose     = document.getElementById('btnCloseModalGenIA');
+  const stepForm     = document.getElementById('stepForm');
+  const stepLoading  = document.getElementById('stepLoading');
+  const stepError    = document.getElementById('stepError');
+  const loadingTitle = document.getElementById('loadingTitle');
+  const loadingSub   = document.getElementById('loadingSubtitle');
+  const errorMessage = document.getElementById('errorMessage');
+
+  const LOADING_STEPS = [
+    ["L'IA analyse la wilaya…", "Croisement des données territoriales avec votre profil…"],
+    ["Recherche d'opportunités…", "Identification des secteurs à fort potentiel local…"],
+    ["Construction des plans d'action…", "Étapes de lancement, financements, rentabilité…"],
+    ["Finalisation du dossier PDF…", "Mise en forme de l'étude de faisabilité…"],
+  ];
+  let loadingInterval = null;
+
+  function startLoadingAnimation() {
+    let i = 0;
+    loadingTitle.textContent = LOADING_STEPS[0][0];
+    loadingSub.textContent = LOADING_STEPS[0][1];
+    loadingInterval = setInterval(() => {
+      i = (i + 1) % LOADING_STEPS.length;
+      loadingTitle.textContent = LOADING_STEPS[i][0];
+      loadingSub.textContent = LOADING_STEPS[i][1];
+    }, 4000);
+  }
+
+  function stopLoadingAnimation() {
+    if (loadingInterval) {
+      clearInterval(loadingInterval);
+      loadingInterval = null;
+    }
+  }
+
+  function showStep(step) {
+    stepForm.classList.toggle('d-none', step !== 'form');
+    stepLoading.classList.toggle('d-none', step !== 'loading');
+    stepError.classList.toggle('d-none', step !== 'error');
+  }
+
+  async function lancerGeneration() {
+    const code = document.getElementById('selectWilayaIA').value;
+
+    btnClose.disabled = true;
+    showStep('loading');
+    startLoadingAnimation();
+
+    try {
+      const res = await fetch(`/api/generate-direct-project/${code}`, { method: 'POST' });
+      const data = await res.json();
+      stopLoadingAnimation();
+
+      if (data.success) {
+        window.location.href = data.redirect_url || "{{ url_for('dashboard') }}";
+      } else {
+        errorMessage.textContent = data.error || 'Erreur lors de la génération.';
+        btnClose.disabled = false;
+        showStep('error');
+      }
+    } catch (e) {
+      console.error(e);
+      stopLoadingAnimation();
+      errorMessage.textContent = 'Erreur réseau — vérifiez votre connexion et réessayez.';
+      btnClose.disabled = false;
+      showStep('error');
+    }
+  }
+
+  btnLancer?.addEventListener('click', lancerGeneration);
+  btnRetry?.addEventListener('click', lancerGeneration);
+
+  document.getElementById('modalGenIA')?.addEventListener('show.bs.modal', () => {
+    btnClose.disabled = false;
+    showStep('form');
+  });
+})();
+</script>
+{% endblock %}

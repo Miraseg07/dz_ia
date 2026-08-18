@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Profil - {{ current_user.username }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-7 col-lg-8">
+    <!-- Carte identitaire -->
+    <div class="dashboard-card mb-3">
+      <div class="d-flex align-items-center">
+        <div class="me-3">
+          <!-- Avatar simple : initiale -->
+          <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center"
+               style="width:64px;height:64px;font-size:28px;font-weight:700;">
+            {{ current_user.username[:1]|upper }}
+          </div>
+        </div>
+        <div>
+          <h3 class="mb-1">{{ current_user.username }}</h3>
+          <div class="text-muted">
+            Membre depuis le {{ current_user.created_at.strftime('%d/%m/%Y à %H:%M') }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Infos principales -->
+    <div class="dashboard-card mb-3">
+      <h5 class="mb-3"><i class="fa-solid fa-id-card text-primary me-2"></i>Informations du compte</h5>
+      <dl class="row mb-0">
+        <dt class="col-sm-4">Nom d'utilisateur</dt>
+        <dd class="col-sm-8">{{ current_user.username }}</dd>
+
+        <dt class="col-sm-4">Adresse email</dt>
+        <dd class="col-sm-8">
+          <span id="email-text">{{ current_user.email }}</span>
+          <button class="btn btn-sm btn-outline-secondary ms-2" type="button" onclick="copyEmail()">
+            <i class="fa-regular fa-copy"></i> Copier
+          </button>
+        </dd>
+
+        <dt class="col-sm-4">Secteur d'intérêt</dt>
+        <dd class="col-sm-8">{{ current_user.secteur_interesse or 'Non spécifié' }}</dd>
+
+        <dt class="col-sm-4">Wilaya de résidence</dt>
+        <dd class="col-sm-8">{{ current_user.wilaya_residence or 'Non spécifiée' }}</dd>
+      </dl>
+    </div>
+
+    <!-- Conseils / liens utiles -->
+    <div class="dashboard-card">
+      <h5 class="mb-3"><i class="fa-solid fa-circle-info text-success me-2"></i>Conseils</h5>
+      <ul class="mb-0">
+        <li>Complétez votre secteur et votre wilaya : les recommandations seront plus pertinentes.</li>
+        <li>Créez au moins un projet dans le <a href="{{ url_for('dashboard') }}">Dashboard</a> pour suivre votre progression.</li>
+        <li>Explorez la <a href="{{ url_for('carte') }}">Carte Interactive</a> pour découvrir les atouts des wilayas.</li>
+      </ul>
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary">
+        <i class="fa-solid fa-arrow-left"></i> Retour au dashboard
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function copyEmail(){
+    const txt = document.getElementById('email-text').textContent.trim();
+    navigator.clipboard.writeText(txt).then(()=>alert('Email copié dans le presse-papiers.'));
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+{% block title %}Carte Interactive - Algérie Entrepreneuriale{% endblock %}
+
+{% block head %}
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    #map{height:65vh;min-height:420px;border-radius:14px}
+    #info-panel.card{position:sticky;top:1rem}
+    .badge-group .badge{margin:0 .25rem .25rem 0}
+    .small-muted{font-size:.92rem;color:#6c757d}
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+  <!-- Overlay plein écran affiché pendant que l'IA génère les projets -->
+  <div id="iaLoadingOverlay" style="
+    display:none; position:fixed; inset:0; z-index:9999;
+    background:rgba(255,255,255,0.94); backdrop-filter:blur(2px);
+    align-items:center; justify-content:center; flex-direction:column;
+    text-align:center; padding:24px;">
+    <div class="spinner-border text-success mb-3" style="width:3.5rem;height:3.5rem;" role="status"></div>
+    <h5 class="fw-bold text-dark mb-2" id="iaLoadingTitle">L'IA analyse la wilaya…</h5>
+    <p class="text-muted small mb-0" id="iaLoadingSubtitle" style="max-width:420px;">
+      Croisement des données territoriales avec votre profil…
+    </p>
+    <div class="progress mt-4" style="height:6px; width:280px;">
+      <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width:100%;"></div>
+    </div>
+    <p class="text-muted small mt-3 mb-0">Cela peut prendre jusqu'à une minute — merci de patienter.</p>
+  </div>
+
+  <!-- En-tête -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card mb-4">
+        <div class="card-body text-center">
+          <h2 class="card-title mb-2">
+            <i class="fas fa-map-marked-alt text-primary"></i>
+            Carte Interactive des Opportunités Entrepreneuriales
+          </h2>
+          <p class="text-muted mb-0">
+            Cliquez sur une wilaya pour découvrir ses opportunités d'investissement
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- Carte -->
+    <div class="col-lg-8"><div id="map"></div></div>
+
+    <!-- Panneau d'infos -->
+    <div class="col-lg-4">
+      <div id="info-panel" class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0" id="info-title">
+            <i class="fa-solid fa-location-dot"></i> Sélectionnez une wilaya
+          </h5>
+        </div>
+        <div class="card-body" id="info-body">
+          <p class="text-muted mb-0">
+            Astuce : zoomez puis cliquez un marqueur pour voir les détails
+            (statistiques, infrastructures, marché, opportunités, etc.).
+          </p>
+        </div>
+      </div>
+
+      <!-- Conseil -->
+      <div class="card mt-3">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Conseil du jour</h5>
+        </div>
+        <div class="card-body">
+          <p class="mb-0">
+            <i class="fas fa-quote-left text-muted"></i>
+            L'Algérie offre de nombreuses opportunités dans l'agriculture,
+            l'agro-alimentaire et les énergies renouvelables. Les wilayas du Sud
+            sont particulièrement adaptées au solaire.
+            <i class="fas fa-quote-right text-muted"></i>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const W = JSON.parse({{ wilayas_json|tojson|safe }});
+  const IS_AUTH = {{ 'true' if current_user.is_authenticated else 'false' }};
+
+  const map = L.map('map').setView([28.0, 2.5], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+
+  const fmt = (n) => (n==null) ? '—' : Number(n).toLocaleString('fr-FR');
+  const badge = (t,cls='secondary') => `<span class="badge bg-${cls} me-1 mb-1">${t}</span>`;
+  const section = (title, icon) => `<h5 class="mt-3 mb-2"><i class="${icon} text-primary"></i> ${title}</h5>`;
+
+  // Contrôle de l'overlay de chargement IA
+  const iaOverlay  = document.getElementById('iaLoadingOverlay');
+  const iaTitleEl  = document.getElementById('iaLoadingTitle');
+  const iaSubEl    = document.getElementById('iaLoadingSubtitle');
+  const IA_LOADING_STEPS = [
+    ["L'IA analyse la wilaya…", "Croisement des données territoriales avec votre profil…"],
+    ["Recherche d'opportunités…", "Identification des secteurs à fort potentiel local…"],
+    ["Construction des plans d'action…", "Étapes de lancement, financements, rentabilité…"],
+    ["Finalisation du dossier PDF…", "Mise en forme de l'étude de faisabilité…"],
+  ];
+  let iaLoadingInterval = null;
+
+  function showIaLoading(){
+    iaOverlay.style.display = 'flex';
+    let i = 0;
+    iaTitleEl.textContent = IA_LOADING_STEPS[0][0];
+    iaSubEl.textContent = IA_LOADING_STEPS[0][1];
+    iaLoadingInterval = setInterval(() => {
+      i = (i + 1) % IA_LOADING_STEPS.length;
+      iaTitleEl.textContent = IA_LOADING_STEPS[i][0];
+      iaSubEl.textContent = IA_LOADING_STEPS[i][1];
+    }, 4000);
+  }
+
+  function hideIaLoading(){
+    iaOverlay.style.display = 'none';
+    if (iaLoadingInterval) { clearInterval(iaLoadingInterval); iaLoadingInterval = null; }
+  }
+
+  Object.keys(W).forEach(code=>{
+    const w = W[code];
+    if (w?.latitude==null || w?.longitude==null) return;
+
+    const m = L.marker([w.latitude, w.longitude]).addTo(map);
+    m.on('click', () => loadDetails(code));
+    m.bindPopup(`
+      <strong>${code} - ${w.nom}</strong>
+      <div class="small-muted mt-1">
+        <i class="fa-solid fa-users text-primary"></i> ${fmt(w.population)}
+        &nbsp;•&nbsp;
+        <i class="fa-regular fa-square text-secondary"></i> ${fmt(w.superficie)} km²
+      </div>
+      <div class="mt-2">
+        <button type="button" class="btn btn-sm btn-success js-more" data-code="${code}">
+          <i class="fa-solid fa-circle-info"></i> Plus d'infos
+        </button>
+      </div>
+    `);
+  });
+
+  map.on('popupopen', (e) => {
+    const el = e.popup.getElement();
+    const btn = el && el.querySelector('.js-more');
+    if (btn){
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault(); ev.stopPropagation();
+        loadDetails(btn.dataset.code);
+      }, { once: true });
+    }
+  });
+
+  async function loadDetails(code){
+    const norm = String(code).padStart(2,'0');
+    try{
+      const res = await fetch(`/api/wilayas/${encodeURIComponent(norm)}/full`, { cache:'no-store' });
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const d = await res.json();
+      renderPanel(norm, d);
+    }catch(e){
+      console.warn('API /full indisponible, fallback base:', e);
+      renderPanelFromBase(norm, W[norm] || W[code]);
+    }
+  }
+
+  function renderPanelFromBase(code, w){
+    if(!w){ alert("Données locales introuvables pour cette wilaya."); return; }
+    document.getElementById('info-title').innerHTML =
+      `<i class="fa-solid fa-location-dot"></i> ${code} - ${w.nom}`;
+
+    const chips = (arr, cls) => (arr||[]).map(x => badge(x, cls)).join(' ') || '<span class="text-muted">—</span>';
+
+    const authBtns = IS_AUTH
+      ? `<div class="d-grid gap-2">
+           <button class="btn btn-success" onclick="postReco('${code}')">
+             <i class="fa-solid fa-brain"></i> Obtenir Recommandations IA
+           </button>
+           <button class="btn btn-outline-primary" onclick="makePdf('${code}')">
+             <i class="fa-regular fa-file-pdf"></i> Dossier IA (PDF)
+           </button>
+         </div>`
+      : `<div class="text-center">
+           <p class="text-muted mb-2">Connectez-vous pour des recommandations personnalisées</p>
+           <a href="{{ url_for('login') }}" class="btn btn-outline-primary">
+             <i class="fas fa-sign-in-alt"></i> Se connecter
+           </a>
+         </div>`;
+
+    document.getElementById('info-body').innerHTML = `
+      ${section('Statistiques','fa-solid fa-chart-line')}
+      <div class="mb-2">
+        <div><i class="fa-solid fa-users text-primary"></i> <strong>Population :</strong> ${fmt(w.population)}</div>
+        <div><i class="fa-regular fa-square text-secondary"></i> <strong>Superficie :</strong> ${fmt(w.superficie)} km²</div>
+      </div>
+
+      ${section('Secteurs clés','fa-solid fa-leaf')}
+      <div class="badge-group">${chips(w.secteurs_cles,'success')}</div>
+
+      ${section('Ressources','fa-solid fa-gem')}
+      <div class="badge-group">${chips(w.ressources,'warning')}</div>
+
+      ${section('Opportunités','fa-solid fa-lightbulb')}
+      <ul class="mb-2">${(w.opportunites||[]).map(o=>`<li>${o}</li>`).join('') || '<li class="text-muted">—</li>'}</ul>
+
+      <div class="mt-3">${authBtns}</div>
+    `;
+  }
+
+  function renderPanel(code, d){
+    document.getElementById('info-title').innerHTML =
+      `<i class="fa-solid fa-location-dot"></i> ${code} - ${d.nom}`;
+
+    const chips = (arr, cls) => (arr||[]).map(x => badge(x, cls)).join(' ') || '<span class="text-muted">—</span>';
+    const oppList = (d.opportunites||[]).length
+      ? `<ul class="mb-2">${d.opportunites.map(o=>`<li>${o}</li>`).join('')}</ul>` : `<p class="text-muted mb-2">—</p>`;
+
+    const authBtns = IS_AUTH
+      ? `<div class="d-grid gap-2">
+           <button class="btn btn-success" onclick="postReco('${code}')">
+             <i class="fa-solid fa-brain"></i> Obtenir Recommandations IA
+           </button>
+           <button class="btn btn-outline-primary" onclick="makePdf('${code}')">
+             <i class="fa-regular fa-file-pdf"></i> Dossier IA (PDF)
+           </button>
+         </div>`
+      : `<div class="text-center">
+           <p class="text-muted mb-2">Connectez-vous pour des recommandations personnalisées</p>
+           <a href="{{ url_for('login') }}" class="btn btn-outline-primary">
+             <i class="fas fa-sign-in-alt"></i> Se connecter
+           </a>
+         </div>`;
+
+    const indic = d.indicateurs ? `
+      ${section('Indicateurs','fa-solid fa-gauge-high')}
+      <div class="small">
+        <div><strong>PIB estimé :</strong> ${fmt(d.indicateurs.pib_estime_dzd)} DZD</div>
+        <div><strong>Chômage :</strong> ${d.indicateurs.taux_chomage ?? '—'} %</div>
+        <div><strong>Créations/1000 hab. :</strong> ${d.indicateurs.taux_creation_entreprises_pour_1000 ?? '—'}</div>
+        <div><strong>Irradiance :</strong> ${d.indicateurs.irradiance_solaire_kwh_m2 ?? '—'} kWh/m²</div>
+        <div><strong>Stress hydrique :</strong> ${d.indicateurs.indice_stress_hydrique ?? '—'}</div>
+        <div><strong>Terres arables :</strong> ${d.indicateurs.pct_terres_arables ?? '—'} %</div>
+        <div><strong>Fibre :</strong> ${d.indicateurs.pct_couverture_fibre ?? '—'} %</div>
+        <div><strong>Port :</strong> ${d.indicateurs.acces_portuaire ? 'Oui' : 'Non'} •
+             <strong>Aéroport :</strong> ${d.indicateurs.acces_aeroportuaire ? 'Oui' : 'Non'}</div>
+      </div>` : '';
+
+    const infra = d.infrastructures ? `
+      ${section('Infrastructures','fa-solid fa-road')}
+      <div class="small">
+        <div>Routes : ${fmt(d.infrastructures.routes_km_estimes)} km • Rail : ${fmt(d.infrastructures.rail_km_estimes)} km</div>
+        <div>Ports : ${fmt(d.infrastructures.nombre_ports)} • Aéroports : ${fmt(d.infrastructures.nombre_aeroports)}</div>
+        <div>Froid : ${fmt(d.infrastructures.capacite_froid_tonnes)} t • Zones indus. : ${fmt(d.infrastructures.zones_industrielles)}</div>
+      </div>` : '';
+
+    const edu = d.education ? `
+      ${section('Éducation & Compétences','fa-solid fa-graduation-cap')}
+      <div class="small">
+        <div>Universités : ${fmt(d.education.nombre_universites)} • Centres pro : ${fmt(d.education.nombre_centres_formation)}</div>
+        <div>Diplômés STEM/an : ${fmt(d.education.diplomes_stem_par_an)}</div>
+      </div>` : '';
+
+    const fin = d.finance ? `
+      ${section('Finance','fa-solid fa-building-columns')}
+      <div class="small">
+        <div>Agences bancaires : ${fmt(d.finance.nombre_agences_bancaires)}</div>
+        <div>Microfinance : ${d.finance.presence_microfinance ? 'Oui' : 'Non'} • Crédit-bail : ${d.finance.presence_credit_bail ? 'Oui' : 'Non'}</div>
+      </div>` : '';
+
+    const num = d.numerique ? `
+      ${section('Numérique','fa-solid fa-wifi')}
+      <div class="small">
+        <div>Mobile : ${fmt(d.numerique.taux_penetration_mobile_pct)} % • Internet : ${fmt(d.numerique.utilisateurs_internet_pct)} %</div>
+        <div>Datacenter : ${d.numerique.presence_datacenter ? 'Oui' : 'Non'}</div>
+      </div>` : '';
+
+    const agri = d.agriculture ? `
+      ${section('Agriculture','fa-solid fa-seedling')}
+      <div class="small mb-1"><strong>Élevage :</strong>
+        ${d.agriculture.elevage ? ` bovins ${fmt(d.agriculture.elevage.bovins)} • ovins ${fmt(d.agriculture.elevage.ovins)} • caprins ${fmt(d.agriculture.elevage.caprins)} • camelins ${fmt(d.agriculture.elevage.camelins)}` : ' —'}
+      </div>
+      <div class="small"><strong>Cultures principales :</strong>
+        <ul>${(d.agriculture.cultures_principales||[]).slice(0,5).map(c => `<li>${c.culture} — ${fmt(c.surface_ha)} ha, ${c.rendement_t_par_ha ?? '—'} t/ha</li>`).join('') || '<li class="text-muted">—</li>'}</ul>
+      </div>` : '';
+
+    const energie = d.energie ? `
+      ${section('Énergie','fa-solid fa-bolt')}
+      <div class="small">
+        <div>Solaire PV : ${fmt(d.energie.potentiel_solaire_pv_mw)} MW • Éolien : ${fmt(d.energie.potentiel_eolien_mw)} MW</div>
+        <div>Champs gaziers : ${d.energie.presence_champs_gaziers ? 'Oui' : 'Non'}</div>
+      </div>` : '';
+
+    const marche = (d.marche || d.indices_couts) ? `
+      ${section('Marché & Coûts','fa-solid fa-store')}
+      <div class="small">
+        ${d.marche ? `Revenu ménages : ${fmt(d.marche.indice_revenu_menages)} • Retail : ${fmt(d.marche.indice_traffic_retail)} • B2B : ${fmt(d.marche.indice_densite_b2b)}` : ''}
+        ${d.indices_couts ? `<div>Coût travail : ${fmt(d.indices_couts.indice_cout_travail)} • Électricité : ${fmt(d.indices_couts.indice_cout_electricite)} • Logistique : ${fmt(d.indices_couts.indice_cout_logistique)}</div>` : ''}
+      </div>` : '';
+
+    const incit = (d.incitations||[]).length
+      ? `${section('Incitations','fa-solid fa-hand-holding-dollar')}<div class="badge-group">${chips(d.incitations,'info')}</div>` : '';
+
+    const dist = d.distance_vers
+      ? `${section('Distances','fa-solid fa-route')}
+         <div class="small">Alger : ${fmt(d.distance_vers.alger_km)} km • Port le plus proche : ${fmt(d.distance_vers.port_le_plus_proche_km)} km</div>` : '';
+
+    const clusters = (d.etiquettes_cluster||[]).length
+      ? `${section('Clusters','fa-solid fa-diagram-project')}<div class="badge-group">${chips(d.etiquettes_cluster,'dark')}</div>` : '';
+
+    const oppDet = (d.opportunites_detaillees||[]).length
+      ? `${section('Opportunités détaillées','fa-solid fa-briefcase')}
+         <ul>${d.opportunites_detaillees.slice(0,3).map(o => `
+           <li><strong>${o.titre}</strong> — ${o.secteur || '—'}
+             <div class="small text-muted">
+               CAPEX : ${fmt(o.capex_dzd_min)}–${fmt(o.capex_dzd_max)} DZD • Emplois : ${fmt(o.emplois_min)}–${fmt(o.emplois_max)} • Payback : ${o.remboursement_annees ?? '—'} ans
+             </div>
+           </li>`).join('')}
+         </ul>` : '';
+
+    document.getElementById('info-body').innerHTML = `
+      ${section('Statistiques','fa-solid fa-chart-line')}
+      <div class="mb-2">
+        <div><i class="fa-solid fa-users text-primary"></i> <strong>Population :</strong> ${fmt(d.population)}</div>
+        <div><i class="fa-regular fa-square text-secondary"></i> <strong>Superficie :</strong> ${fmt(d.superficie)} km²</div>
+      </div>
+
+      ${section('Secteurs clés','fa-solid fa-leaf')}
+      <div class="badge-group">${chips(d.secteurs_cles,'success')}</div>
+
+      ${section('Ressources','fa-solid fa-gem')}
+      <div class="badge-group">${chips(d.ressources,'warning')}</div>
+
+      ${section('Opportunités','fa-solid fa-lightbulb')}
+      ${oppDet || oppList}
+
+      ${indic} ${infra} ${edu} ${fin} ${num} ${agri} ${energie} ${marche} ${incit} ${dist} ${clusters}
+
+      <div class="mt-3">${authBtns}</div>
+    `;
+  }
+
+  // Recommandations IA — overlay + redirection AUTOMATIQUE vers le dashboard
+  window.postReco = function(code){
+    const norm = String(code).padStart(2,'0');
+    showIaLoading();
+    fetch(`/api/recommendations/${norm}`, { method:'POST' })
+      .then(r=>r.json())
+      .then(d=>{
+        if(!d.success){
+          hideIaLoading();
+          alert('⚠️ Erreur : ' + (d.error || 'génération échouée.'));
+          return;
+        }
+        // Redirection directe vers le dashboard dès que l'IA a fini —
+        // c'est là que l'utilisateur télécharge les résultats en PDF.
+        window.location.href = d.redirect_url || '/dashboard';
+      })
+      .catch(() => {
+        hideIaLoading();
+        alert('❌ Erreur réseau.');
+      });
+  };
+
+  // Dossier IA (PDF) — génère aussi le projet, avec overlay
+  window.makePdf = function(code){
+    const norm = String(code).padStart(2,'0');
+    showIaLoading();
+    fetch(`/api/recommendation-pdf/${encodeURIComponent(norm)}`, { method:'POST' })
+      .then(r => r.json())
+      .then(d => {
+        hideIaLoading();
+        if (!d.success) return alert('Erreur : ' + (d.error || 'génération échouée.'));
+        const openNow = confirm("PDF généré et projet créé dans votre dashboard.\n\nOuvrir le PDF maintenant ?");
+        if (openNow && d.pdf_url) window.open(d.pdf_url, '_blank');
+      })
+      .catch(err => { hideIaLoading(); alert('Erreur réseau : ' + err); });
+  };
+});
+</script>
+{% endblock %}

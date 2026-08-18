@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 mx-auto">
+                <h1 class="display-4 fw-bold mb-4">
+                    <i class="fas fa-rocket"></i> 
+                    Développez Votre Entreprise en Algérie
+                </h1>
+                <p class="lead mb-4">
+                    Découvrez les meilleures opportunités d'investissement dans les 58 wilayas d'Algérie. 
+                    Notre plateforme intelligente vous guide vers les secteurs les plus prometteurs.
+                </p>
+                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                    <a href="{{ url_for('carte') }}" class="btn btn-light btn-lg">
+                        <i class="fas fa-map"></i> Explorer la Carte
+                    </a>
+                    {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('register') }}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-user-plus"></i> Commencer Gratuitement
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-tachometer-alt"></i> Mon Dashboard
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container my-5">
+    <!-- Statistiques -->
+    <div class="row mb-5">
+        <div class="col-md-3 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-map-marker-alt mb-3" style="font-size: 2.5rem;"></i>
+                    <div class="stats-number">58</div>
+                    <p class="mb-0">Wilayas Couvertes</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-industry mb-3" style="font-size: 2.5rem;"></i>
+                    <div class="stats-number">200+</div>
+                    <p class="mb-0">Secteurs Analysés</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-users mb-3" style="font-size: 2.5rem;"></i>
+                    <div class="stats-number">1000+</div>
+                    <p class="mb-0">Entrepreneurs Aidés</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="card stats-card h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-line mb-3" style="font-size: 2.5rem;"></i>
+                    <div class="stats-number">95%</div>
+                    <p class="mb-0">Taux de Réussite</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fonctionnalités -->
+    <div class="row mb-5">
+        <div class="col-12 text-center mb-5">
+            <h2 class="display-5 fw-bold">Nos Services</h2>
+            <p class="lead text-muted">Des outils intelligents pour votre succès entrepreneurial</p>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 text-center">
+                <div class="card-body p-4">
+                    <i class="fas fa-brain feature-icon"></i>
+                    <h5 class="card-title">IA Recommandations</h5>
+                    <p class="card-text">
+                        Notre intelligence artificielle analyse vos préférences et recommande 
+                        les meilleures opportunités dans votre secteur.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 text-center">
+                <div class="card-body p-4">
+                    <i class="fas fa-map-marked-alt feature-icon"></i>
+                    <h5 class="card-title">Carte Interactive</h5>
+                    <p class="card-text">
+                        Explorez les 58 wilayas d'Algérie avec des données en temps réel 
+                        sur les opportunités d'investissement.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100 text-center">
+                <div class="card-body p-4">
+                    <i class="fas fa-chart-pie feature-icon"></i>
+                    <h5 class="card-title">Analytics Avancées</h5>
+                    <p class="card-text">
+                        Tableau de bord complet avec analyses détaillées des marchés 
+                        et tendances par région.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call to Action -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center py-5">
+                    <h3 class="card-title mb-3">Prêt à Commencer Votre Aventure ?</h3>
+                    <p class="card-text lead mb-4">
+                        Rejoignez des milliers d'entrepreneurs qui ont transformé leurs idées en succès
+                    </p>
+                    {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('register') }}" class="btn btn-light btn-lg">
+                        <i class="fas fa-rocket"></i> Créer Mon Compte Gratuit
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-light btn-lg">
+                        <i class="fas fa-tachometer-alt"></i> Accéder au Dashboard
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
